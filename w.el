@@ -5,7 +5,7 @@
 ;; Author: Le Wang
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "28.1"))
-;; Keywords: convenience, frames
+;; Keywords: convenience, workspaces
 ;; URL: https://github.com/lewang/w
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -31,11 +31,22 @@
 
 (require 'tab-bar)
 
+(defgroup w nil
+  "Thin workspace manager on top of tab-bar-mode."
+  :group 'convenience
+  :prefix "w-")
+
 ;;; Variables
 
 (defvar w-workspaces nil
   "List of workspace plists.
 Each plist has keys :name, :project-root, and :reset-function.")
+
+(defcustom w-default-reset-function #'find-file
+  "Default reset function for new workspaces.
+Called with the project root directory as its sole argument."
+  :type 'function
+  :group 'w)
 
 (defvar w-after-reset-hook nil
   "Hook run after a workspace reset-function is called in a new tab.
@@ -117,9 +128,14 @@ Interactively, prompt for name, project-root, and reset-function.
 Programmatically, accept a plist (:name ... :project-root ... :reset-function ...).
 Does NOT create a tab; use `w-go' for that."
   (interactive
-   (list :name (read-string "Workspace name: ")
-         :project-root (read-directory-name "Project root: ")
-         :reset-function (w--read-reset-function "Reset function: ")))
+   (let* ((root (read-directory-name "Project root: " default-directory))
+          (base (file-name-nondirectory (directory-file-name root))))
+     (list :name (read-string "Workspace name: " base)
+           :project-root root
+           :reset-function (w--read-reset-function
+                            (format "Reset function (default %s): "
+                                    w-default-reset-function)
+                            w-default-reset-function))))
   (let* ((name (plist-get args :name))
          (project-root (plist-get args :project-root))
          (reset-fn (plist-get args :reset-function))
@@ -180,7 +196,7 @@ Defaults to current workspace if in one."
 
 (defun w-current ()
   "Return current workspace plist or nil."
-  (when-let ((name (w--tab-workspace-name)))
+  (when-let* ((name (w--tab-workspace-name)))
     (w--find-workspace name)))
 
 (provide 'w)
