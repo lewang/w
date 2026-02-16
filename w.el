@@ -23,9 +23,23 @@
 
 ;;; Commentary:
 
-;; A workspace is just a name + project root + reset function.  The reset
-;; function sets up windows/buffers in a fresh tab.  No buffer tracking,
-;; window state persistence, autosave, or hidden hooks.
+;; A workspace is a name + project root + reset function.  The reset
+;; function receives the project root and sets up windows/buffers in a
+;; fresh tab.  No buffer tracking, window-state persistence, autosave,
+;; or hidden hooks.
+;;
+;; Usage:
+;;
+;;   (w-new :name "myproject"
+;;          :project-root "~/src/myproject/"
+;;          :reset-function #'find-file)
+;;
+;;   (w-go "myproject")    ; creates tab, calls reset function
+;;   (w-go "myproject")    ; switches to existing tab
+;;
+;; Persist across sessions with savehist:
+;;
+;;   (add-to-list 'savehist-additional-variables 'w-workspaces)
 
 ;;; Code:
 
@@ -48,16 +62,22 @@ Called with the project root directory as its sole argument."
   :type 'function
   :group 'w)
 
-(defvar w-after-reset-hook nil
+(defcustom w-after-reset-hook nil
   "Hook run after a workspace reset-function is called in a new tab.
-Each function receives the workspace plist as its argument.")
+Each function receives the workspace plist as its argument."
+  :type 'hook
+  :group 'w)
 
-(defvar w-after-switch-hook nil
+(defcustom w-after-switch-hook nil
   "Hook run after switching to an existing workspace tab.
-Each function receives the workspace plist as its argument.")
+Each function receives the workspace plist as its argument."
+  :type 'hook
+  :group 'w)
 
-(defvar w-name-prefix "w: "
-  "Prefix for tab names created by w.")
+(defcustom w-name-prefix "w: "
+  "Prefix for tab names created by w."
+  :type 'string
+  :group 'w)
 
 ;;; Internal functions
 
@@ -72,6 +92,10 @@ Each function receives the workspace plist as its argument.")
               (let ((ws-name (alist-get 'w-workspace (cdr tab))))
                 (and ws-name (string= ws-name name))))
             (funcall tab-bar-tabs-function)))
+
+;; NOTE: `tab-bar--current-tab-find' is internal to tab-bar.el but
+;; is the only way to get a mutable reference to the current tab's
+;; alist.  No public API exists for storing custom per-tab data.
 
 (defun w--set-tab-workspace (name)
   "Store workspace NAME on the current tab."
@@ -125,8 +149,8 @@ reset-function with project-root, rename the tab, and run
 (defun w-new (&rest args)
   "Add a workspace.
 Interactively, prompt for name, project-root, and reset-function.
-Programmatically, accept a plist (:name ... :project-root ... :reset-function ...).
-Does NOT create a tab; use `w-go' for that."
+Programmatically, accept a plist with keys :name, :project-root,
+and :reset-function.  Does NOT create a tab; use `w-go' for that."
   (interactive
    (let* ((root (read-directory-name "Project root: " default-directory))
           (base (file-name-nondirectory (directory-file-name root))))
