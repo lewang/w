@@ -87,11 +87,14 @@ Each function receives the workspace plist as its argument."
             w-workspaces))
 
 (defun w--find-tab (name)
-  "Scan tabs for one with `w-workspace' = NAME.  Return tab or nil."
-  (seq-find (lambda (tab)
-              (let ((ws-name (alist-get 'w-workspace (cdr tab))))
-                (and ws-name (string= ws-name name))))
-            (funcall tab-bar-tabs-function)))
+  "Search all frames for a tab tagged with workspace NAME.
+Return (TAB . FRAME) or nil."
+  (catch 'found
+    (dolist (frame (frame-list))
+      (dolist (tab (funcall tab-bar-tabs-function frame))
+        (when (equal name (alist-get 'w-workspace (cdr tab)))
+          (throw 'found (cons tab frame)))))
+    nil))
 
 ;; NOTE: `tab-bar--current-tab-find' is internal to tab-bar.el but
 ;; is the only way to get a mutable reference to the current tab's
@@ -121,9 +124,10 @@ Optional DEFAULT is a symbol used as the default value."
 
 ;;;###autoload
 (defun w-go (name)
-  "Switch to workspace NAME.
-If a tab exists for this workspace, switch to it and run
-`w-after-switch-hook'.  Otherwise create a new tab, set
+  "Switch to workspace NAME, searching all frames for its tab.
+If a tab exists for this workspace on any frame, select that
+frame and switch to the tab, then run `w-after-switch-hook'.
+Otherwise create a new tab on the current frame, set
 `default-directory' to the workspace's project-root, call the
 reset-function with project-root, rename the tab, and run
 `w-after-reset-hook'."
@@ -131,9 +135,11 @@ reset-function with project-root, rename the tab, and run
   (let ((ws (w--find-workspace name)))
     (unless ws
       (user-error "No workspace named %s" name))
-    (let ((tab (w--find-tab name)))
-      (if tab
-          (progn
+    (let ((found (w--find-tab name)))
+      (if found
+          (let ((tab (car found))
+                (frame (cdr found)))
+            (select-frame-set-input-focus frame)
             (tab-bar-switch-to-tab (alist-get 'name (cdr tab)))
             (run-hook-with-args 'w-after-switch-hook ws))
         (let ((project-root (plist-get ws :project-root))
@@ -179,9 +185,10 @@ If it has an open tab, close that tab too."
   (let ((ws (w--find-workspace name)))
     (unless ws
       (user-error "No workspace named %s" name))
-    (let ((tab (w--find-tab name)))
-      (when tab
-        (tab-bar-close-tab-by-name (alist-get 'name (cdr tab)))))
+    (when-let* ((found (w--find-tab name)))
+      (let ((tab (car found))
+            (frame (cdr found)))
+        (tab-bar-close-tab-by-name (alist-get 'name (cdr tab)) frame)))
     (setq w-workspaces (seq-remove (lambda (w) (string= (plist-get w :name) name))
                                    w-workspaces))))
 
@@ -210,12 +217,13 @@ Defaults to current workspace if in one."
       (plist-put ws :reset-function new-fn)
       ;; If the name changed, update the tab too
       (unless (string= old-name new-name)
-        (let ((tab (w--find-tab old-name)))
-          (when tab
-            (let ((idx (1+ (seq-position (funcall tab-bar-tabs-function) tab #'eq))))
-              (tab-bar-rename-tab (concat w-name-prefix new-name) idx)
-              ;; Update the workspace key on the tab
-              (setf (alist-get 'w-workspace (cdr tab)) new-name)))))
+        (when-let* ((found (w--find-tab old-name)))
+          (let* ((tab (car found))
+                 (frame (cdr found))
+                 (tabs (funcall tab-bar-tabs-function frame))
+                 (idx (1+ (seq-position tabs tab #'eq))))
+            (tab-bar-rename-tab (concat w-name-prefix new-name) idx frame)
+            (setf (alist-get 'w-workspace (cdr tab)) new-name))))
       ws)))
 
 (defun w-current ()
