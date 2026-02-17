@@ -189,7 +189,8 @@ If it has an open tab, close that tab too."
     (when-let* ((found (w--find-tab name)))
       (let ((tab (car found))
             (frame (cdr found)))
-        (tab-bar-close-tab-by-name (alist-get 'name (cdr tab)) frame)))
+        (with-selected-frame frame
+          (tab-bar-close-tab-by-name (alist-get 'name (cdr tab))))))
     (setq w-workspaces (seq-remove (lambda (w) (string= (plist-get w :name) name))
                                    w-workspaces))))
 
@@ -223,7 +224,8 @@ Defaults to current workspace if in one."
                  (frame (cdr found))
                  (tabs (funcall tab-bar-tabs-function frame))
                  (idx (1+ (seq-position tabs tab #'eq))))
-            (tab-bar-rename-tab (concat w-name-prefix new-name) idx frame)
+            (with-selected-frame frame
+              (tab-bar-rename-tab (concat w-name-prefix new-name) idx))
             (setf (alist-get 'w-workspace (cdr tab)) new-name))))
       ws)))
 
