@@ -43,7 +43,6 @@
 
 ;;; Code:
 
-(require 'cl-lib)
 (require 'tab-bar)
 
 (defgroup w nil
@@ -56,19 +55,6 @@
 (defvar w-workspaces nil
   "List of workspace plists.
 Each plist has keys :name, :project-root, and :populate-fn.")
-
-(defun w--migrate-workspaces ()
-  "Migrate old plist keys in `w-workspaces'."
-  (let (migrated)
-    (dolist (ws w-workspaces)
-      (when-let* ((fn (plist-get ws :reset-function)))
-        (plist-put ws :populate-fn fn)
-        (cl-remf ws :reset-function)
-        (setq migrated t)))
-    (when (and migrated (bound-and-true-p savehist-mode))
-      (savehist-save))))
-
-(w--migrate-workspaces)
 
 (defcustom w-default-populate-fn #'find-file
   "Default populate function for new workspaces.
