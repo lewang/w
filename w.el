@@ -231,5 +231,73 @@ Defaults to current workspace if in one."
   (when-let* ((name (w--tab-workspace-name)))
     (w--find-workspace name)))
 
+;;; Visit
+
+(defun w--target-dir (target)
+  "Return the directory associated with TARGET.
+TARGET is a buffer name or file path."
+  (if-let* ((buf (get-buffer target)))
+      (buffer-local-value 'default-directory buf)
+    (when (file-exists-p target)
+      (if (file-directory-p target)
+          (file-name-as-directory target)
+        (file-name-directory (expand-file-name target))))))
+
+(defun w--find-best-workspace (target-dir)
+  "Return the workspace whose :project-root best matches TARGET-DIR.
+Best match is the workspace with the longest project-root that is
+a prefix of TARGET-DIR."
+  (let ((target-dir (expand-file-name (file-name-as-directory target-dir)))
+        best best-len)
+    (dolist (ws w-workspaces)
+      (when-let* ((dir (plist-get ws :project-root))
+                  (dir (expand-file-name (file-name-as-directory dir))))
+        (when (and (string-prefix-p dir target-dir)
+                   (or (null best-len) (> (length dir) best-len)))
+          (setq best ws
+                best-len (length dir)))))
+    best))
+
+;;;###autoload
+(defun w-visit (target)
+  "Visit TARGET in its matching workspace.
+TARGET is a buffer name or file path.  Find a workspace whose
+project-root contains TARGET, or create one from `project-current'.
+Then switch to that workspace (crossing frames if needed) and
+display TARGET there."
+  (interactive
+   (list (completing-read "Buffer or file: "
+                          (completion-table-merge
+                           #'internal-complete-buffer
+                           #'read-file-name-internal))))
+  (let* ((target-dir (w--target-dir target))
+         (ws (when target-dir (w--find-best-workspace target-dir))))
+    (unless ws
+      (let* ((proj (or (and target-dir
+                            (let ((default-directory target-dir))
+                              (project-current)))
+                       (user-error "Cannot determine project for %s" target)))
+             (root (expand-file-name
+                    (file-name-as-directory (project-root proj)))))
+        (setq ws (or (seq-find (lambda (w)
+                                 (string= root
+                                          (expand-file-name
+                                           (file-name-as-directory
+                                            (plist-get w :project-root)))))
+                               w-workspaces)
+                     (w-new :name (file-name-nondirectory
+                                   (directory-file-name root))
+                            :project-root root
+                            :reset-function w-default-reset-function)))))
+    (w-go (plist-get ws :name))
+    (pop-to-buffer (if (get-buffer target)
+                       target
+                     (find-file-noselect target)))))
+
+;;;###autoload
+(with-eval-after-load 'embark
+  (define-key embark-buffer-map (kbd "v") #'w-visit)
+  (define-key embark-file-map   (kbd "v") #'w-visit))
+
 (provide 'w)
 ;;; w.el ends here

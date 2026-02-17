@@ -20,18 +20,19 @@ This is a standard Emacs Lisp package (no build tool, Makefile, or test suite). 
 
 ## Architecture
 
-Code lives in `w.el` (core) and `w-embark.el` (Embark integration). Key structure:
+All code lives in `w.el`. Key structure:
 
 - **State** — `w-workspaces` (list of plists) is the sole data store. Each tab carries a `w-workspace` alist entry
   linking it back to a workspace name.
 - **Internal helpers** (`w--` prefix) — find workspaces/tabs, read user input via completing-read, get/set the
   workspace name on a tab. `w--find-tab` searches across all frames, returning `(TAB . FRAME)`.
 - **Commands** — `w-go` (switch/create, crosses frames), `w-new` (register), `w-delete` (remove), `w-edit` (modify
-  fields), `w-current` (query).
+  fields), `w-current` (query), `w-visit` (open buffer/file in its matching workspace, auto-creates from
+  `project-current` if needed).
 - **Hooks** — `w-after-reset-hook` (new tab created), `w-after-switch-hook` (switched to existing tab). Both receive
   the workspace plist.
-- **Embark** (`w-embark.el`) — `w-embark-visit` opens a buffer/file in its matching workspace. If no workspace exists,
-  one is auto-created from `project-current` with default settings.
+- **Embark** — Keybindings for `w-visit` in `embark-buffer-map` / `embark-file-map` are set up via
+  `with-eval-after-load` in `w.el` (no hard dependency on Embark).
 
 ## Conventions
 
