@@ -294,6 +294,29 @@ display TARGET there."
                        target
                      (find-file-noselect target)))))
 
+;;;###autoload
+(defun w-teleport ()
+  "Send the current buffer to its home workspace.
+If the current buffer does not belong under the current workspace's
+project-root, replace it in this window with the workspace's root
+directory, then visit the buffer in its matching workspace via
+`w-visit'."
+  (interactive)
+  (let* ((ws (w-current))
+         (buf (current-buffer))
+         (target (or (buffer-file-name buf) (buffer-name buf)))
+         (target-dir (w--target-dir target))
+         (root (when ws
+                 (expand-file-name
+                  (file-name-as-directory (plist-get ws :project-root))))))
+    (unless ws
+      (user-error "Not in a workspace"))
+    (when (and target-dir
+               (string-prefix-p root (expand-file-name target-dir)))
+      (user-error "Buffer already belongs to this workspace"))
+    (switch-to-buffer (dired-noselect root))
+    (w-visit target)))
+
 (defvar embark-buffer-map)
 (defvar embark-file-map)
 
