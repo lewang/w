@@ -310,8 +310,8 @@ directory, then visit the buffer in its matching workspace via
       (user-error "Not in a workspace"))
     (when (and target-dir (eq ws (w--find-best-workspace target-dir)))
       (user-error "Buffer already belongs to this workspace"))
-    (switch-to-buffer
-     (dired-noselect (plist-get ws :project-root)))
+    (funcall (plist-get ws :reset-function)
+             (plist-get ws :project-root))
     (w-visit target)))
 
 (defvar embark-buffer-map)
