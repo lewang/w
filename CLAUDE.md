@@ -28,7 +28,7 @@ All code lives in `w.el`. Key structure:
   workspace name on a tab. `w--find-tab` searches across all frames, returning `(TAB . FRAME)`.
 - **Commands** — `w-go` (switch/create, crosses frames), `w-new` (register), `w-delete` (remove), `w-edit` (modify
   fields), `w-current` (query), `w-visit` (open buffer/file in its matching workspace, auto-creates from
-  `project-current` if needed).
+  `project-current` if needed), `w-teleport` (send current buffer to its home workspace).
 - **Hooks** — `w-after-populate-hook` (new tab created), `w-after-switch-hook` (switched to existing tab). Both receive
   the workspace plist.
 - **Embark** — Keybindings for `w-visit` in `embark-buffer-map` / `embark-file-map` are set up via
