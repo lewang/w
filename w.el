@@ -305,16 +305,13 @@ directory, then visit the buffer in its matching workspace via
   (let* ((ws (w-current))
          (buf (current-buffer))
          (target (or (buffer-file-name buf) (buffer-name buf)))
-         (target-dir (w--target-dir target))
-         (root (when ws
-                 (expand-file-name
-                  (file-name-as-directory (plist-get ws :project-root))))))
+         (target-dir (w--target-dir target)))
     (unless ws
       (user-error "Not in a workspace"))
-    (when (and target-dir
-               (string-prefix-p root (expand-file-name target-dir)))
+    (when (and target-dir (eq ws (w--find-best-workspace target-dir)))
       (user-error "Buffer already belongs to this workspace"))
-    (switch-to-buffer (dired-noselect root))
+    (switch-to-buffer
+     (dired-noselect (plist-get ws :project-root)))
     (w-visit target)))
 
 (defvar embark-buffer-map)
