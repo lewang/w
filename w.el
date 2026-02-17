@@ -44,6 +44,7 @@
 ;;; Code:
 
 (require 'tab-bar)
+(eval-when-compile (require 'project))
 
 (defgroup w nil
   "Thin workspace manager on top of tab-bar-mode."
