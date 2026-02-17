@@ -294,6 +294,9 @@ display TARGET there."
                        target
                      (find-file-noselect target)))))
 
+(defvar embark-buffer-map)
+(defvar embark-file-map)
+
 ;;;###autoload
 (with-eval-after-load 'embark
   (define-key embark-buffer-map (kbd "v") #'w-visit)
