@@ -23,18 +23,18 @@
 
 ;;; Commentary:
 
-;; A workspace is a name + project root + reset function.  The reset
-;; function receives the project root and sets up windows/buffers in a
-;; fresh tab.  No buffer tracking, window-state persistence, autosave,
-;; or hidden hooks.
+;; A workspace is a name + project root + populate function.  The
+;; populate function receives the project root and sets up
+;; windows/buffers in a fresh tab.  No buffer tracking, window-state
+;; persistence, autosave, or hidden hooks.
 ;;
 ;; Usage:
 ;;
 ;;   (w-new :name "myproject"
 ;;          :project-root "~/src/myproject/"
-;;          :reset-function #'find-file)
+;;          :populate-fn #'find-file)
 ;;
-;;   (w-go "myproject")    ; creates tab, calls reset function
+;;   (w-go "myproject")    ; creates tab, calls populate function
 ;;   (w-go "myproject")    ; switches to existing tab
 ;;
 ;; Persist across sessions with savehist:
@@ -43,6 +43,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'tab-bar)
 
 (defgroup w nil
@@ -54,16 +55,29 @@
 
 (defvar w-workspaces nil
   "List of workspace plists.
-Each plist has keys :name, :project-root, and :reset-function.")
+Each plist has keys :name, :project-root, and :populate-fn.")
 
-(defcustom w-default-reset-function #'find-file
-  "Default reset function for new workspaces.
+(defun w--migrate-workspaces ()
+  "Migrate old plist keys in `w-workspaces'."
+  (let (migrated)
+    (dolist (ws w-workspaces)
+      (when-let* ((fn (plist-get ws :reset-function)))
+        (plist-put ws :populate-fn fn)
+        (cl-remf ws :reset-function)
+        (setq migrated t)))
+    (when (and migrated (bound-and-true-p savehist-mode))
+      (savehist-save))))
+
+(w--migrate-workspaces)
+
+(defcustom w-default-populate-fn #'find-file
+  "Default populate function for new workspaces.
 Called with the project root directory as its sole argument."
   :type 'function
   :group 'w)
 
-(defcustom w-after-reset-hook nil
-  "Hook run after a workspace reset-function is called in a new tab.
+(defcustom w-after-populate-hook nil
+  "Hook run after a workspace populate function is called in a new tab.
 Each function receives the workspace plist as its argument."
   :type 'hook
   :group 'w)
@@ -114,7 +128,7 @@ Optional DEFAULT is used as the default value."
   (let ((names (mapcar (lambda (ws) (plist-get ws :name)) w-workspaces)))
     (completing-read prompt names nil t nil nil default)))
 
-(defun w--read-reset-function (prompt &optional default)
+(defun w--read-populate-fn (prompt &optional default)
   "Completing-read for a function with PROMPT.
 Optional DEFAULT is a symbol used as the default value."
   (intern (completing-read prompt obarray #'functionp t nil nil
@@ -129,8 +143,8 @@ If a tab exists for this workspace on any frame, select that
 frame and switch to the tab, then run `w-after-switch-hook'.
 Otherwise create a new tab on the current frame, set
 `default-directory' to the workspace's project-root, call the
-reset-function with project-root, rename the tab, and run
-`w-after-reset-hook'."
+populate function with project-root, rename the tab, and run
+`w-after-populate-hook'."
   (interactive (list (w--read-workspace "Workspace: ")))
   (let ((ws (w--find-workspace name)))
     (unless ws
@@ -143,35 +157,35 @@ reset-function with project-root, rename the tab, and run
             (tab-bar-switch-to-tab (alist-get 'name (cdr tab)))
             (run-hook-with-args 'w-after-switch-hook ws))
         (let ((project-root (plist-get ws :project-root))
-              (reset-fn (plist-get ws :reset-function)))
+              (populate-fn (plist-get ws :populate-fn)))
           (tab-bar-new-tab)
           (tab-bar-rename-tab (concat w-name-prefix name))
           (w--set-tab-workspace name)
           (let ((default-directory project-root))
-            (funcall reset-fn project-root))
-          (run-hook-with-args 'w-after-reset-hook ws))))))
+            (funcall populate-fn project-root))
+          (run-hook-with-args 'w-after-populate-hook ws))))))
 
 ;;;###autoload
 (defun w-new (&rest args)
   "Add a workspace.
-Interactively, prompt for name, project-root, and reset-function.
+Interactively, prompt for name, project-root, and populate function.
 Programmatically, accept a plist with keys :name, :project-root,
-and :reset-function.  Does NOT create a tab; use `w-go' for that."
+and :populate-fn.  Does NOT create a tab; use `w-go' for that."
   (interactive
    (let* ((root (read-directory-name "Project root: " default-directory))
           (base (file-name-nondirectory (directory-file-name root))))
      (list :name (read-string "Workspace name: " base)
            :project-root root
-           :reset-function (w--read-reset-function
-                            (format "Reset function (default %s): "
-                                    w-default-reset-function)
-                            w-default-reset-function))))
+           :populate-fn (w--read-populate-fn
+                            (format "Populate function (default %s): "
+                                    w-default-populate-fn)
+                            w-default-populate-fn))))
   (let* ((name (plist-get args :name))
          (project-root (plist-get args :project-root))
-         (reset-fn (plist-get args :reset-function))
+         (populate-fn (plist-get args :populate-fn))
          (ws (list :name name
                    :project-root project-root
-                   :reset-function reset-fn)))
+                   :populate-fn populate-fn)))
     (when (w--find-workspace name)
       (user-error "Workspace %s already exists" name))
     (push ws w-workspaces)
@@ -208,13 +222,13 @@ Defaults to current workspace if in one."
     (let* ((old-name (plist-get ws :name))
            (new-name (read-string "Name: " old-name))
            (new-root (read-directory-name "Project root: " (plist-get ws :project-root)))
-           (new-fn (w--read-reset-function
-                    (format "Reset function (default %s): "
-                            (plist-get ws :reset-function))
-                    (plist-get ws :reset-function))))
+           (new-fn (w--read-populate-fn
+                    (format "Populate function (default %s): "
+                            (plist-get ws :populate-fn))
+                    (plist-get ws :populate-fn))))
       (plist-put ws :name new-name)
       (plist-put ws :project-root new-root)
-      (plist-put ws :reset-function new-fn)
+      (plist-put ws :populate-fn new-fn)
       ;; If the name changed, update the tab too
       (unless (string= old-name new-name)
         (when-let* ((found (w--find-tab old-name)))
@@ -288,7 +302,7 @@ display TARGET there."
                      (w-new :name (file-name-nondirectory
                                    (directory-file-name root))
                             :project-root root
-                            :reset-function w-default-reset-function)))))
+                            :populate-fn w-default-populate-fn)))))
     (w-go (plist-get ws :name))
     (pop-to-buffer (if (get-buffer target)
                        target
@@ -310,7 +324,7 @@ directory, then visit the buffer in its matching workspace via
       (user-error "Not in a workspace"))
     (when (and target-dir (eq ws (w--find-best-workspace target-dir)))
       (user-error "Buffer already belongs to this workspace"))
-    (funcall (plist-get ws :reset-function)
+    (funcall (plist-get ws :populate-fn)
              (plist-get ws :project-root))
     (w-visit target)))
 

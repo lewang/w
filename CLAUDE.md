@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overview
 
 `w.el` is a single-file Emacs Lisp package — a thin workspace manager built on top of `tab-bar-mode`. A workspace is
-a plist with three keys: `:name`, `:project-root`, and `:reset-function`. The reset function receives the project root
+a plist with three keys: `:name`, `:project-root`, and `:populate-fn`. The populate function receives the project root
 and sets up windows/buffers in a fresh tab. There is no buffer tracking, window-state persistence, or autosave.
 
 ## Development
@@ -29,7 +29,7 @@ All code lives in `w.el`. Key structure:
 - **Commands** — `w-go` (switch/create, crosses frames), `w-new` (register), `w-delete` (remove), `w-edit` (modify
   fields), `w-current` (query), `w-visit` (open buffer/file in its matching workspace, auto-creates from
   `project-current` if needed).
-- **Hooks** — `w-after-reset-hook` (new tab created), `w-after-switch-hook` (switched to existing tab). Both receive
+- **Hooks** — `w-after-populate-hook` (new tab created), `w-after-switch-hook` (switched to existing tab). Both receive
   the workspace plist.
 - **Embark** — Keybindings for `w-visit` in `embark-buffer-map` / `embark-file-map` are set up via
   `with-eval-after-load` in `w.el` (no hard dependency on Embark).
