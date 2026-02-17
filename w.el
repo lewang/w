@@ -157,7 +157,9 @@ populate function with project-root, rename the tab, and run
   "Add a workspace.
 Interactively, prompt for name, project-root, and populate function.
 Programmatically, accept a plist with keys :name, :project-root,
-and :populate-fn.  Does NOT create a tab; use `w-go' for that."
+and :populate-fn.  Does NOT create a tab; use `w-go' for that.
+See also `w-visit' which creates a workspace and opens a target
+in one step."
   (interactive
    (let* ((root (read-directory-name "Project root: " default-directory))
           (base (file-name-nondirectory (directory-file-name root))))
