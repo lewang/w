@@ -63,7 +63,11 @@ TARGET is a buffer name or file path.  Find a workspace whose
 project-root contains TARGET, or create one from `project-current'.
 Then switch to that workspace (crossing frames if needed) and
 display TARGET there."
-  (interactive "sBuffer or file: ")
+  (interactive
+   (list (completing-read "Buffer or file: "
+                          (completion-table-merge
+                           #'internal-complete-buffer
+                           #'read-file-name-internal))))
   (let* ((target-dir (w-embark--target-dir target))
          (ws (when target-dir (w-embark--find-best target-dir))))
     (unless ws
