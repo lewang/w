@@ -264,10 +264,11 @@ a prefix of TARGET-DIR."
 ;;;###autoload
 (defun w-visit (target)
   "Visit TARGET in its matching workspace.
-TARGET is a buffer name or file path.  Find a workspace whose
-project-root contains TARGET, or create one from `project-current'.
-Then switch to that workspace (crossing frames if needed) and
-display TARGET there."
+TARGET is a buffer name or file path.  Find the workspace whose
+project-root best matches TARGET.  If none exists, look up the
+project via `project-current' and either find a workspace for that
+root or create one.  Then switch to that workspace (crossing frames
+if needed) and display TARGET there."
   (interactive
    (list (completing-read "Buffer or file: "
                           (completion-table-merge
