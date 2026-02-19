@@ -12,6 +12,7 @@ windows/buffers in a fresh tab. No buffer tracking, window-state persistence, au
 - `w-delete` — remove a workspace and close its tab
 - `w-edit` — modify a workspace's fields
 - `w-current` — return the current workspace plist (or nil)
+- `w-visit` — open a buffer/file in its project's workspace; prefills with a misplaced buffer on the current frame
 
 ## Persistence with savehist
 

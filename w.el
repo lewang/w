@@ -248,6 +248,24 @@ TARGET is a buffer name or file path."
           (file-name-as-directory target)
         (file-name-directory (expand-file-name target))))))
 
+(defun w--first-foreign-buffer ()
+  "Return first buffer on the frame not belonging to the current workspace."
+  (when-let* ((ws (w-current))
+              (ws-root (expand-file-name
+                        (file-name-as-directory
+                         (plist-get ws :project-root)))))
+    (catch 'found
+      (dolist (win (window-list))
+        (let* ((buf (window-buffer win))
+               (dir (buffer-local-value 'default-directory buf))
+               (proj (and dir (let ((default-directory dir))
+                                (project-current))))
+               (root (and proj (expand-file-name
+                                (file-name-as-directory (project-root proj))))))
+          (when (and root (not (string= root ws-root)))
+            (throw 'found buf))))
+      nil)))
+
 (defun w--find-workspace-for-root (root)
   "Return the workspace whose :project-root matches ROOT exactly."
   (let ((root (expand-file-name (file-name-as-directory root))))
@@ -264,12 +282,22 @@ TARGET is a buffer name or file path."
 TARGET is a buffer name or file path.  Determine the project root
 via `project-current', then find the workspace with that exact root.
 If no workspace exists, create one.  Then switch to that workspace
-\(crossing frames if needed) and display TARGET there."
+\(crossing frames if needed) and display TARGET there.
+
+Interactively, prefill with the first buffer on the current frame
+that belongs to a different project than the current workspace.
+When leaving for a different workspace, repopulate the current
+workspace's tab first."
   (interactive
-   (list (completing-read "Buffer or file: "
-                          (completion-table-merge
-                           #'internal-complete-buffer
-                           #'read-file-name-internal))))
+   (let* ((foreign (w--first-foreign-buffer))
+          (default (or (buffer-file-name (or foreign (current-buffer)))
+                       (buffer-name (or foreign (current-buffer))))))
+     (list (completing-read (format "Buffer or file (default %s): "
+                                    (file-name-nondirectory default))
+                            (completion-table-merge
+                             #'internal-complete-buffer
+                             #'read-file-name-internal)
+                            nil nil nil nil default))))
   (let* ((target-dir (w--target-dir target))
          (proj (and target-dir
                     (let ((default-directory target-dir))
@@ -283,38 +311,14 @@ If no workspace exists, create one.  Then switch to that workspace
                              :project-root root
                              :populate-fn w-default-populate-fn))
                  (user-error "Cannot determine project for %s" target))))
+    (when-let* ((current-ws (w-current)))
+      (unless (string= (plist-get ws :name) (plist-get current-ws :name))
+        (funcall (plist-get current-ws :populate-fn)
+                 (plist-get current-ws :project-root))))
     (w-go (plist-get ws :name))
     (pop-to-buffer (if (get-buffer target)
                        target
                      (find-file-noselect target)))))
-
-;;;###autoload
-(defun w-teleport ()
-  "Send the current buffer to its home workspace.
-If the current buffer does not belong under the current workspace's
-project-root, replace it in this window with the workspace's root
-directory, then visit the buffer in its matching workspace via
-`w-visit'."
-  (interactive)
-  (let* ((ws (w-current))
-         (buf (current-buffer))
-         (target (or (buffer-file-name buf) (buffer-name buf)))
-         (target-dir (w--target-dir target)))
-    (unless ws
-      (user-error "Not in a workspace"))
-    (when-let* ((proj (and target-dir
-                           (let ((default-directory target-dir))
-                             (project-current))))
-                 (root (expand-file-name
-                        (file-name-as-directory (project-root proj)))))
-      (when (string= root
-                     (expand-file-name
-                      (file-name-as-directory
-                       (plist-get ws :project-root))))
-        (user-error "Buffer already belongs to this workspace")))
-    (funcall (plist-get ws :populate-fn)
-             (plist-get ws :project-root))
-    (w-visit target)))
 
 (defvar embark-buffer-map)
 (defvar embark-file-map)
