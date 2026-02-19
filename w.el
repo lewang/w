@@ -248,53 +248,41 @@ TARGET is a buffer name or file path."
           (file-name-as-directory target)
         (file-name-directory (expand-file-name target))))))
 
-(defun w--find-best-workspace (target-dir)
-  "Return the workspace whose :project-root best matches TARGET-DIR.
-Best match is the workspace with the longest project-root that is
-a prefix of TARGET-DIR."
-  (let ((target-dir (expand-file-name (file-name-as-directory target-dir)))
-        best best-len)
-    (dolist (ws w-workspaces)
-      (when-let* ((dir (plist-get ws :project-root))
-                  (dir (expand-file-name (file-name-as-directory dir))))
-        (when (and (string-prefix-p dir target-dir)
-                   (or (null best-len) (> (length dir) best-len)))
-          (setq best ws
-                best-len (length dir)))))
-    best))
+(defun w--find-workspace-for-root (root)
+  "Return the workspace whose :project-root matches ROOT exactly."
+  (let ((root (expand-file-name (file-name-as-directory root))))
+    (seq-find (lambda (ws)
+                (string= root
+                         (expand-file-name
+                          (file-name-as-directory
+                           (plist-get ws :project-root)))))
+              w-workspaces)))
 
 ;;;###autoload
 (defun w-visit (target)
   "Visit TARGET in its matching workspace.
-TARGET is a buffer name or file path.  Find the workspace whose
-project-root best matches TARGET.  If none exists, look up the
-project via `project-current' and either find a workspace for that
-root or create one.  Then switch to that workspace (crossing frames
-if needed) and display TARGET there."
+TARGET is a buffer name or file path.  Determine the project root
+via `project-current', then find the workspace with that exact root.
+If no workspace exists, create one.  Then switch to that workspace
+\(crossing frames if needed) and display TARGET there."
   (interactive
    (list (completing-read "Buffer or file: "
                           (completion-table-merge
                            #'internal-complete-buffer
                            #'read-file-name-internal))))
   (let* ((target-dir (w--target-dir target))
-         (ws (when target-dir (w--find-best-workspace target-dir))))
-    (unless ws
-      (let* ((proj (or (and target-dir
-                            (let ((default-directory target-dir))
-                              (project-current)))
-                       (user-error "Cannot determine project for %s" target)))
-             (root (expand-file-name
-                    (file-name-as-directory (project-root proj)))))
-        (setq ws (or (seq-find (lambda (w)
-                                 (string= root
-                                          (expand-file-name
-                                           (file-name-as-directory
-                                            (plist-get w :project-root)))))
-                               w-workspaces)
-                     (w-new :name (file-name-nondirectory
-                                   (directory-file-name root))
-                            :project-root root
-                            :populate-fn w-default-populate-fn)))))
+         (proj (and target-dir
+                    (let ((default-directory target-dir))
+                      (project-current))))
+         (root (and proj (expand-file-name
+                          (file-name-as-directory (project-root proj)))))
+         (ws (or (and root (w--find-workspace-for-root root))
+                 (and root
+                      (w-new :name (file-name-nondirectory
+                                    (directory-file-name root))
+                             :project-root root
+                             :populate-fn w-default-populate-fn))
+                 (user-error "Cannot determine project for %s" target))))
     (w-go (plist-get ws :name))
     (pop-to-buffer (if (get-buffer target)
                        target
@@ -314,8 +302,16 @@ directory, then visit the buffer in its matching workspace via
          (target-dir (w--target-dir target)))
     (unless ws
       (user-error "Not in a workspace"))
-    (when (and target-dir (eq ws (w--find-best-workspace target-dir)))
-      (user-error "Buffer already belongs to this workspace"))
+    (when-let* ((proj (and target-dir
+                           (let ((default-directory target-dir))
+                             (project-current))))
+                 (root (expand-file-name
+                        (file-name-as-directory (project-root proj)))))
+      (when (string= root
+                     (expand-file-name
+                      (file-name-as-directory
+                       (plist-get ws :project-root))))
+        (user-error "Buffer already belongs to this workspace")))
     (funcall (plist-get ws :populate-fn)
              (plist-get ws :project-root))
     (w-visit target)))
