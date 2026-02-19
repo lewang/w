@@ -27,7 +27,8 @@ All code lives in `w.el`. Key structure:
 - **Internal helpers** (`w--` prefix) — find workspaces/tabs, read user input via completing-read, get/set the
   workspace name on a tab. `w--find-tab` searches across all frames, returning `(TAB . FRAME)`.
 - **Commands** — `w-go` (switch/create, crosses frames), `w-new` (register), `w-delete` (remove tab and workspace
-  entry), `w-close` (kill project buffers + delete, `C-u` skips prompt), `w-edit` (modify fields), `w-current`
+  entry), `w-close` (kill project buffers + close tab, keeps workspace registered; `C-u` skips prompt), `w-edit`
+  (modify fields), `w-current`
   (query), `w-visit` (open buffer/file in its matching workspace, auto-creates from `project-current` if needed;
   repopulates current workspace when target moves elsewhere).
 - **Hooks** — `w-after-populate-hook` (new tab created), `w-after-switch-hook` (switched to existing tab). Both receive
