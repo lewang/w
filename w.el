@@ -210,7 +210,8 @@ WS is a workspace plist."
 
 ;;;###autoload
 (defun w-close (name &optional no-confirm)
-  "Close workspace NAME: kill its buffers, then remove it.
+  "Close workspace NAME: kill its buffers and close its tab.
+The workspace remains registered in `w-workspaces'.
 Prompt before killing buffers unless NO-CONFIRM is non-nil
 \(interactively, with \\[universal-argument]).
 Defaults to the current workspace."
@@ -228,7 +229,11 @@ Defaults to the current workspace."
           (mapc #'kill-buffer bufs)
         (when (yes-or-no-p (format "Kill %d buffer(s) for %s? " (length bufs) name))
           (mapc #'kill-buffer bufs))))
-    (w-delete name)))
+    (when-let* ((found (w--find-tab name)))
+      (let ((tab (car found))
+            (frame (cdr found)))
+        (with-selected-frame frame
+          (tab-bar-close-tab-by-name (alist-get 'name (cdr tab))))))))
 
 ;;;###autoload
 (defun w-edit (name)
