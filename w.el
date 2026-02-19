@@ -196,15 +196,16 @@ If it has an open tab, close that tab too."
     (setq w-workspaces (seq-remove (lambda (w) (string= (plist-get w :name) name))
                                    w-workspaces))))
 
-(defun w--project-buffers (project-root)
-  "Return buffers whose file or `default-directory' is under PROJECT-ROOT."
-  (let ((root (expand-file-name (file-name-as-directory project-root))))
+(defun w--project-buffers (ws)
+  "Return buffers whose file or `default-directory' is under WS's project root.
+WS is a workspace plist."
+  (let ((root (plist-get ws :project-root)))
     (seq-filter
      (lambda (buf)
        (or (when-let* ((file (buffer-file-name buf)))
-             (string-prefix-p root (expand-file-name file)))
+             (string-prefix-p root file))
            (when-let* ((dir (buffer-local-value 'default-directory buf)))
-             (string-prefix-p root (expand-file-name dir)))))
+             (string-prefix-p root dir))))
      (buffer-list))))
 
 ;;;###autoload
@@ -221,7 +222,7 @@ Defaults to the current workspace."
            current-prefix-arg)))
   (let* ((ws (w--find-workspace name))
          (_ (unless ws (user-error "No workspace named %s" name)))
-         (bufs (w--project-buffers (plist-get ws :project-root))))
+         (bufs (w--project-buffers ws)))
     (when bufs
       (if no-confirm
           (mapc #'kill-buffer bufs)
