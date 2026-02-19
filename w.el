@@ -196,6 +196,39 @@ If it has an open tab, close that tab too."
     (setq w-workspaces (seq-remove (lambda (w) (string= (plist-get w :name) name))
                                    w-workspaces))))
 
+(defun w--project-buffers (project-root)
+  "Return buffers whose file or `default-directory' is under PROJECT-ROOT."
+  (let ((root (expand-file-name (file-name-as-directory project-root))))
+    (seq-filter
+     (lambda (buf)
+       (or (when-let* ((file (buffer-file-name buf)))
+             (string-prefix-p root (expand-file-name file)))
+           (when-let* ((dir (buffer-local-value 'default-directory buf)))
+             (string-prefix-p root (expand-file-name dir)))))
+     (buffer-list))))
+
+;;;###autoload
+(defun w-close (name &optional no-confirm)
+  "Close workspace NAME: kill its buffers, then remove it.
+Prompt before killing buffers unless NO-CONFIRM is non-nil
+\(interactively, with \\[universal-argument]).
+Defaults to the current workspace."
+  (interactive
+   (let ((current (w--tab-workspace-name)))
+     (list (if current
+               (w--read-workspace (format "Close workspace (default %s): " current) current)
+             (w--read-workspace "Close workspace: "))
+           current-prefix-arg)))
+  (let* ((ws (w--find-workspace name))
+         (_ (unless ws (user-error "No workspace named %s" name)))
+         (bufs (w--project-buffers (plist-get ws :project-root))))
+    (when bufs
+      (if no-confirm
+          (mapc #'kill-buffer bufs)
+        (when (yes-or-no-p (format "Kill %d buffer(s) for %s? " (length bufs) name))
+          (mapc #'kill-buffer bufs))))
+    (w-delete name)))
+
 ;;;###autoload
 (defun w-edit (name)
   "Edit workspace NAME's fields.
