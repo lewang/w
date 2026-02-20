@@ -10,7 +10,8 @@ windows/buffers in a fresh tab. No buffer tracking, window-state persistence, au
 - `w-new` — register a workspace (does not create a tab)
 - `w-go` — switch to a workspace; creates a new tab and calls the reset function if none exists
 - `w-delete` — remove a workspace and close its tab
-- `w-close` — kill project buffers and close tab; workspace stays registered (`C-u` to skip confirmation)
+- `w-close` — close workspace tab; workspace stays registered
+- `w-mode` — global minor mode; when enabled, closing a workspace tab prompts to kill its project buffers
 - `w-edit` — modify a workspace's fields
 - `w-current` — return the current workspace plist (or nil)
 - `w-visit` — open a buffer/file in its project's workspace; prefills with a misplaced buffer on the current frame

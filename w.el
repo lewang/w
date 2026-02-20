@@ -208,32 +208,45 @@ WS is a workspace plist."
              (string-prefix-p root dir))))
      (buffer-list))))
 
+(defun w--on-tab-pre-close (tab _last-tab-p)
+  "Kill project buffers when closing a workspace tab.
+Prompt for confirmation.  Added to
+`tab-bar-tab-pre-close-functions' by `w-mode'."
+  (when-let* ((name (alist-get 'w-workspace (cdr tab)))
+              (ws (w--find-workspace name))
+              (bufs (w--project-buffers ws)))
+    (when (yes-or-no-p (format "Kill %d buffer(s) for %s? " (length bufs) name))
+      (mapc #'kill-buffer bufs))))
+
 ;;;###autoload
-(defun w-close (name &optional no-confirm)
-  "Close workspace NAME: kill its buffers and close its tab.
+(define-minor-mode w-mode
+  "Global minor mode for workspace management.
+When enabled, closing a workspace tab prompts to kill its project buffers."
+  :global t
+  :group 'w
+  (if w-mode
+      (add-hook 'tab-bar-tab-pre-close-functions #'w--on-tab-pre-close)
+    (remove-hook 'tab-bar-tab-pre-close-functions #'w--on-tab-pre-close)))
+
+;;;###autoload
+(defun w-close (name)
+  "Close workspace NAME's tab.
 The workspace remains registered in `w-workspaces'.
-Prompt before killing buffers unless NO-CONFIRM is non-nil
-\(interactively, with \\[universal-argument]).
+When `w-mode' is active, closing the tab prompts to kill project buffers.
 Defaults to the current workspace."
   (interactive
    (let ((current (w--tab-workspace-name)))
      (list (if current
                (w--read-workspace (format "Close workspace (default %s): " current) current)
-             (w--read-workspace "Close workspace: "))
-           current-prefix-arg)))
-  (let* ((ws (w--find-workspace name))
-         (_ (unless ws (user-error "No workspace named %s" name)))
-         (bufs (w--project-buffers ws)))
-    (when bufs
-      (if no-confirm
-          (mapc #'kill-buffer bufs)
-        (when (yes-or-no-p (format "Kill %d buffer(s) for %s? " (length bufs) name))
-          (mapc #'kill-buffer bufs))))
-    (when-let* ((found (w--find-tab name)))
-      (let ((tab (car found))
-            (frame (cdr found)))
-        (with-selected-frame frame
-          (tab-bar-close-tab-by-name (alist-get 'name (cdr tab))))))))
+             (w--read-workspace "Close workspace: ")))))
+  (let ((ws (w--find-workspace name)))
+    (unless ws (user-error "No workspace named %s" name))
+    (if-let* ((found (w--find-tab name)))
+        (let ((tab (car found))
+              (frame (cdr found)))
+          (with-selected-frame frame
+            (tab-bar-close-tab-by-name (alist-get 'name (cdr tab)))))
+      (user-error "Workspace %s has no open tab" name))))
 
 ;;;###autoload
 (defun w-edit (name)
