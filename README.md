@@ -17,36 +17,19 @@ windows/buffers in a fresh tab. No buffer tracking, window-state persistence, or
 
 ## w-mode
 
-`w-mode` is a global minor mode that cleans up project buffers when a workspace tab is closed — by any means
-(`w-close`, `w-delete`, `tab-bar-close-tab`, or clicking the tab-bar close button).
-
-Without `w-mode`, closing a tab leaves the workspace's buffers open. With `w-mode`, you get a confirmation prompt to
-kill them. This is implemented via `tab-bar-tab-pre-close-functions`, which is why a minor mode is needed: it gives you
-a clean way to install and remove the hook.
-
-```elisp
-(w-mode 1)
-```
-
-## Persistence with savehist
-
-`w-workspaces` is a plain variable holding a list of plists. Add it to `savehist-additional-variables` to persist
-workspace definitions across Emacs sessions:
-
-```elisp
-(use-package savehist
-  :config
-  (add-to-list 'savehist-additional-variables 'w-workspaces)
-  (savehist-mode 1))
-```
-
-This works because workspace plists contain only strings and symbols, which `print`/`read` round-trip cleanly.
+`w-mode` is a global minor mode that prompts to kill project buffers when any workspace tab is closed — whether via
+`w-close`, `tab-bar-close-tab`, or the tab-bar UI. Uses `tab-bar-tab-pre-close-functions` under the hood.
 
 ## Installation
 
-Requires Emacs 28.1+. Place `w.el` on your `load-path` and:
+Requires Emacs 28.1+.
 
 ```elisp
-(require 'w)
-(w-mode 1)
+(use-package w
+  :config
+  (w-mode 1)
+  (with-eval-after-load 'savehist
+    (add-to-list 'savehist-additional-variables 'w-workspaces)))
 ```
+
+`w-workspaces` contains only strings and symbols, so it round-trips cleanly through `savehist`.
