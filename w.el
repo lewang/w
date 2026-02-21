@@ -198,25 +198,32 @@ If it has an open tab, close that tab too."
 
 (defun w--project-buffers (ws)
   "Return buffers whose file or `default-directory' is under WS's project root.
-WS is a workspace plist."
+WS is a workspace plist.  Excludes minibuffers and internal buffers."
   (let ((root (plist-get ws :project-root)))
     (seq-filter
      (lambda (buf)
-       (or (when-let* ((file (buffer-file-name buf)))
-             (string-prefix-p root file))
-           (when-let* ((dir (buffer-local-value 'default-directory buf)))
-             (string-prefix-p root dir))))
+       (and (not (minibufferp buf))
+            (not (string-prefix-p " " (buffer-name buf)))
+            (or (when-let* ((file (buffer-file-name buf)))
+                  (string-prefix-p root file))
+                (when-let* ((dir (buffer-local-value 'default-directory buf)))
+                  (string-prefix-p root dir)))))
      (buffer-list))))
+
+(defvar w--closing-tab nil
+  "Non-nil while `w--on-tab-pre-close' is running, to prevent re-entrancy.")
 
 (defun w--on-tab-pre-close (tab _last-tab-p)
   "Kill project buffers when closing a workspace tab.
 Prompt for confirmation.  Added to
 `tab-bar-tab-pre-close-functions' by `w-mode'."
-  (when-let* ((name (alist-get 'w-workspace (cdr tab)))
-              (ws (w--find-workspace name))
-              (bufs (w--project-buffers ws)))
-    (when (yes-or-no-p (format "Kill %d buffer(s) for %s? " (length bufs) name))
-      (mapc #'kill-buffer bufs))))
+  (unless w--closing-tab
+    (when-let* ((name (alist-get 'w-workspace (cdr tab)))
+                (ws (w--find-workspace name))
+                (bufs (w--project-buffers ws)))
+      (when (yes-or-no-p (format "Kill %d buffer(s) for %s? " (length bufs) name))
+        (let ((w--closing-tab t))
+          (mapc #'kill-buffer bufs))))))
 
 ;;;###autoload
 (define-minor-mode w-mode
